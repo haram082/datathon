@@ -1,11 +1,14 @@
 ---
-title: "Datathon 2023: Investigating Airline Delays During College Student Travel in the 5Cs"
-output: html_document
+title: 'Datathon 2023: Investigating Airline Delays During College Student Travel
+  in the 5Cs'
+output:
+  html_document: default
+  pdf_document: default
 date: "2023-10-21"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE)
 ```
 
 
@@ -86,6 +89,80 @@ break_delay_times %>% ggplot(aes(x = mean_delay, y = DEST_CITY_NAME, color = CAR
   theme_minimal()
 ```
 This visualization highlights the carriers and destinations with the lowest and highest average delays during student travel periods. Students can use this to make more informed airline selections when booking flights home from college. This is help college students figure out which airline to take from either the Ontario and LAX. It even tells us which airlines are historically available at these airports and their mean delay times. For example, if you go to Chicago from LAX, Alaska Airlines should not be your first option.
+
+
+
+
+```{r}
+library(sf)
+library(mapview)
+library(leaflet)
+library(RColorBrewer)
+library(ggmap)
+```
+
+### Mapping Delays in Arriving Flights to LAX and ONT
+```{r, echo=FALSE}
+flights <- read.csv("datathon_train.csv")
+```
+
+```{r, echo=FALSE}
+uscities <- read.csv("uscities.csv")
+
+city_coords <- uscities %>%
+  select(city, state_id, lat, lng)
+```
+
+```{r, echo=FALSE}
+a_flights <- flights %>%
+  filter(DEST == "LAX" | DEST == "ONT")
+
+colnames(a_flights) <- c("A_ID", "A_MONTH", "A_DAY_OF_MONTH", "A_DAY_OF_WEEK", "A_DEPARTING_AIRPORT", "A_ORIGIN_CITY_NAME", "A_DEST", "A_DEST_CITY_NAME", "A_DEP_TIME_BLK", "A_DISTANCE", "A_SEGMENT_NUMBER", "A_CONCURRENT_FLIGHTS", "A_MANUFACTURE_YEAR", "A_NUMBER_OF_SEATS", "A_CARRIER_NAME", "A_AIRPORT_FLIGHTS_MONTH", "A_AIRLINE_FLIGHTS_MONTH", "A_AIRLINE_AIRPORT_FLIGHTS_MONTH", "A_AVG_MONTHLY_PASS_AIRPORT", "A_AVG_MONTHLY_PASS_AIRLINE", "A_CARGO_HANDLING", "A_FLT_ATTENDANTS_PER_PASS", "A_GROUND_SERV_PER_PASS", "A_PLANE_AGE", "A_PREVIOUS_AIRPORT", "A_PRCP", "A_SNOW", "A_SNWD", "A_TMAX", "A_AWND", "A_DEP_DELAY_NEW", "A_IS_DELAYED")
+
+a_flights$A_DEPT_CITY <- substr(a_flights$A_ORIGIN_CITY_NAME, 1, nchar(a_flights$A_ORIGIN_CITY_NAME) - 4)
+a_flights$A_DEPT_STATE <- substr(a_flights$A_ORIGIN_CITY_NAME, nchar(a_flights$A_ORIGIN_CITY_NAME) - 1, nchar(a_flights$A_ORIGIN_CITY_NAME))
+a_flights$A_DEST_CITY <- substr(a_flights$A_DEST_CITY_NAME, 1, nchar(a_flights$A_DEST_CITY_NAME) - 4)
+a_flights$A_DEST_STATE <- substr(a_flights$A_DEST_CITY_NAME, nchar(a_flights$A_DEST_CITY_NAME) - 1, nchar(a_flights$A_DEST_CITY_NAME))
+
+a_flights$A_DEPT_TIME_1 <- strtoi(substr(a_flights$A_DEP_TIME_BLK, 1, 4), base=0L)
+
+```
+
+```{r, echo=FALSE}
+a_flights <- merge(a_flights, city_coords, by.x = c("A_DEPT_CITY", "A_DEPT_STATE"), by.y = c("city", "state_id"))
+```
+
+```{r, echo=FALSE}
+a_flights <- a_flights %>%
+  group_by(A_DEPT_CITY, A_DEPT_STATE, lat, lng) %>%
+  summarize(n = n(), mean_delay = mean(A_DEP_DELAY_NEW))
+```
+
+```{r, echo=FALSE}
+mypopup <- glue::glue("<strong><u>{a_flights$A_DEPT_CITY} Airport</strong></u><br />
+                      <b>Number of flights to LAX and ONT: <b>{a_flights$n}<br />
+                      <b>Mean Delay: </b>{a_flights$mean_delay} minutes<br />") %>%
+  lapply(htmltools::HTML)
+```
+
+
+```{r}
+origin_airports <- a_flights %>%
+  mapview(xcol = "lng", ycol = "lat", zcol = "mean_delay", popup = mypopup, crs = 4269, grid = FALSE)
+origin_airports
+```
+
+
+```{r}
+mapshot(origin_airports, url = paste0(getwd(), "/origin_airports.html"))
+```
+Next, we took a subset of the dataset containing only flights arriving at LAX or ONT, and visualized these flights.
+
+
+This interactive map visualizes all flights arriving at LAX and ONT from every other airport in the US. Each airport is colored based on the mean delay that flights to LAX and ONT experience. If you click on the points, you will be able to see the airport name, the number of flights to LAX and ONT, and the mean delay for these flights. 
+
+
+This allows Claremont College students to see which flight routes may experience delays, which would allow them to better select flights to take when returning home over breaks.
 
 
 
