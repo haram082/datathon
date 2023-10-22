@@ -1,29 +1,91 @@
 ---
-title: "datathon"
+title: "Datathon 2023: Investigating Airline Delays During College Student Travel in the 5Cs"
 output: html_document
 date: "2023-10-21"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(stringr)
+library(lubridate)
+library(ggthemes)
+datathon <- read.csv("datathon_train.csv", header = TRUE, sep = ",", stringsAsFactors = FALSE)
 ```
 
-## Including Plots
+## By Haram Yoon and Kartika Santonso
+College students often experience the frustration of delayed flights when traveling home for academic breaks. As students book tickets home for the holidays, they want to choose airlines that are less likely to experience delays departing from major college town airports.
 
-You can also embed plots, for example:
+In this report, we analyzed airline flight data to uncover insights into delay rates for different carriers around college student travel periods. They focused on flights leaving college town airports during the typical breaks within the academic calendar.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+The goal was to identify airlines that tend to have higher versus lower delays when serving college student travelers. The findings can help students make informed decisions when booking flights home for Thanksgiving, winter break, spring break, and other peak travel times.
+
+We loaded historical flight data into R and filtered for flights departing from the major airports, Ontario and LAX, near the 5cs. We calculated delay rates for different airlines during the busy student travel periods. Finally, we visualized the airline delay patterns to highlight carriers with relatively high and low delays.
+
+The report outlines the analysis process and key findings. The results provide data-driven guidance to help college students choose airlines with the best on-time reliability when planning trips home.
+
+
+### Delay Rates for Major Carriers During Holiday Travel Out of LAX and Ontario
+First, I filter the flights dataset to only include those originating from LAX or Ontario airports. I then create a date variable from the month and day columns. Next, I isolated flights during the busy holiday travel periods in October, November, December 2023 and March 2024. I then group the data by carrier and the specified date ranges. For each group, I calculate the proportion of flights delayed Finally, I visualize the delay rate for each carrier and time period in a stacked bar chart.
+```{r, echo=FALSE}
+datathon %>% filter(ORIGIN_CITY_NAME  == "Los Angeles, CA" | ORIGIN_CITY_NAME == "Ontario, CA") %>%
+    mutate(date = make_date(year= 2023, month = MONTH, day = DAY_OF_MONTH)) %>%
+    filter((MONTH == 10 & DAY_OF_MONTH >= 12 & DAY_OF_MONTH <= 14) |
+         (MONTH == 11 & DAY_OF_MONTH >= 19 & DAY_OF_MONTH <= 22) |
+         (MONTH == 12 & DAY_OF_MONTH >= 13 & DAY_OF_MONTH <= 17) |
+         (MONTH == 3 & DAY_OF_MONTH >= 8 & DAY_OF_MONTH <= 10) |
+          MONTH == 5 & DAY_OF_MONTH >= 8 & DAY_OF_MONTH <= 11) %>%
+    group_by(CARRIER_NAME, period = cut(date, breaks = c(ymd("2023-10-12"), ymd("2023-11-19"), ymd("2023-12-13"), ymd("2023-03-08"), ymd("2023-5-8"), Inf), labels = c("Oct 12-14", "Nov 19-22", "Dec 13-17", "Mar 8-10", "May 8-11")) ) %>%
+   summarize(n_delays = sum(DEP_DELAY_NEW)/ n()) %>%
+  ggplot(aes(x=period, y= n_delays, fill=CARRIER_NAME)) +
+  geom_bar(stat="Identity", position='fill')+
+labs(title = "Number of Delays for each Carrier",
+       x = "Break Dates",
+       y = "N Delays",
+       color = "Carrier Name") +
+  theme_minimal()
+  
 ```
+This chart shows the relative delay rates for major carriers during the specified holiday travel periods out of LAX and Ontario. We can see that some carriers experienced higher delays than others during the busy travel times. This information could help college student choose the best airline for holidays from the 5Cs. For example, Frontier Airlines have a big proportion of the delays found before winter break. Companies such as United consistently stay on the lower proportions of delays regardless of seasons. Our plot will help 5c students to figure out which airlines are more likely to have delays per break.
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+### Exploring Airline Delay Patterns for Student Travel
+To dig deeper into airline delays during student travel periods, I calculated the average delay time for flights departing college towns during academic breaks.
+
+First, I filtered the data to only include flights leaving LAX or Ontario airports, and limited to the break travel periods previously identified. I then grouped the flights by origin city, destination, and airline carrier. For each group, I calculated the total delay, number of flights, and mean delay time. Finally, I visualized the mean delay time for each airline and destination as a faceted dot plot w margins of errors.
+```{r, echo=FALSE}
+break_delay_times <- datathon %>%
+  filter(ORIGIN_CITY_NAME  == "Los Angeles, CA" | ORIGIN_CITY_NAME == "Ontario, CA") %>%
+  mutate(date = make_date(month = MONTH, day = DAY_OF_MONTH)) %>%
+    filter((MONTH == 10 & DAY_OF_MONTH >= 12 & DAY_OF_MONTH <= 14) |
+         (MONTH == 11 & DAY_OF_MONTH >= 19 & DAY_OF_MONTH <= 22) |
+         (MONTH == 12 & DAY_OF_MONTH >= 13 & DAY_OF_MONTH <= 17) |
+         (MONTH == 3 & DAY_OF_MONTH >= 8 & DAY_OF_MONTH <= 10)) %>%
+  group_by( ORIGIN_CITY_NAME, DEST_CITY_NAME, CARRIER_NAME ) %>%
+  summarize(total_delay = sum(DEP_DELAY_NEW), n =n(), mean_delay= mean(DEP_DELAY_NEW)) 
+
+
+```
+```{r,  fig.width=10, fig.height=10, echo=FALSE}
+break_delay_times %>% ggplot(aes(x = mean_delay, y = DEST_CITY_NAME, color = CARRIER_NAME)) +
+  geom_point(size = 1)  +
+  geom_errorbarh(aes(xmin = mean_delay - sd(mean_delay), xmax = mean_delay + sd(mean_delay)), height = 0) +
+  facet_grid(~ORIGIN_CITY_NAME) +
+  labs(title = "Mean Delay Time for Flights from Los Angeles and Ontario during break times",
+       x = "Mean Delay Time (minutes)",
+       y = "Destination City",
+       color = "Carrier Name") +
+  theme_minimal()
+```
+This visualization highlights the carriers and destinations with the lowest and highest average delays during student travel periods. Students can use this to make more informed airline selections when booking flights home from college. This is help college students figure out which airline to take from either the Ontario and LAX. It even tells us which airlines are historically available at these airports and their mean delay times. For example, if you go to Chicago from LAX, Alaska Airlines should not be your first option.
+
+
+
