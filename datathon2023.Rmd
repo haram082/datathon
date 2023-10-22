@@ -4,6 +4,7 @@ title: 'Datathon 2023: Investigating Airline Delays During College Student Trave
 output:
   html_document: default
   pdf_document: default
+  github_document: default
 date: "2023-10-21"
 ---
 
@@ -166,3 +167,8 @@ This allows Claremont College students to see which flight routes may experience
 
 
 
+### Ethics
+We acknowledge that in generalizing flight delays for airlines and routes, this could result in a loss of sales for these airlines and paths, which could ultimately impact workers for these airlines. We also realize that since we are using past data, it isn't indictative of future and present conditions for these airlines and routes. 
+
+## Github Link
+https://github.com/haram082/datathon.git
